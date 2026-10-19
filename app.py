@@ -273,7 +273,17 @@ def get_ai_recommendations(
 
     if gemini_key:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+            # Supports both old AIza keys and new AQ auth keys via Authorization header
+            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {gemini_key}" if gemini_key.startswith("AQ") else None
+            }
+            # Fall back to URL parameter if it's a legacy key format
+            if not gemini_key.startswith("AQ"):
+                url = f"{url}?key={gemini_key}"
+                headers = {"Content-Type": "application/json"}
+
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "systemInstruction": {
@@ -281,7 +291,7 @@ def get_ai_recommendations(
                 },
                 "generationConfig": {"temperature": 0.3},
             }
-            res = requests.post(url, json=payload, timeout=20)
+            res = requests.post(url, json=payload, headers=headers, timeout=20)
             if res.status_code == 200:
                 raw_text = (
                     res.json()["candidates"][0]["content"]["parts"][0][
@@ -294,9 +304,12 @@ def get_ai_recommendations(
                     .strip()
                 )
                 return json.loads(cleaned)
+            else:
+                st.sidebar.error(f"Gemini API Error ({res.status_code}): {res.text}")
         except Exception as e:
-            st.error(f"Recommendation generation error: {e}")
+            st.sidebar.error(f"Recommendation generation error: {e}")
 
+    # Fallback curated pool
     curated_pool = [
         {
             "title": "Texhnolyze",
@@ -308,40 +321,39 @@ def get_ai_recommendations(
             "comparable_to": "Serial Experiments Lain, Ergo Proxy",
         },
         {
-            "title": "Memories",
-            "year": 1995,
-            "director_studio": "Katsuhiro Otomo, Koji Morimoto / Studio 4°C",
-            "format": "Anthology Film",
-            "platforms": ["High Seas Archival", "Prime Video"],
-            "editorial_thesis": "A premier showcase of late-cel animation across three vignettes. 'Magnetic Rose' stands as one of the most haunting operatic space-horror pieces ever committed to film.",
-            "comparable_to": "Akira, Perfect Blue",
-        },
-        {
-            "title": "Kaiba",
-            "year": 2008,
-            "director_studio": "Masaaki Yuasa / Madhouse",
-            "format": "TV Series (12 eps)",
+            "title": "Ergo Proxy",
+            "year": 2004,
+            "director_studio": "Shukou Murase / Manglobe",
+            "format": "TV Series (23 eps)",
             "platforms": ["Crunchyroll"],
-            "editorial_thesis": "Contrasts retro Osamu Tezuka aesthetics with a devastating critique of memory commodification and class division.",
-            "comparable_to": "Kino's Journey, The Tatami Galaxy",
+            "editorial_thesis": "A philosophical cyberpunk investigation into self-awareness, Gnostic theology, and android autonomy within a domed post-apocalyptic utopia.",
+            "comparable_to": "Texhnolyze, Psycho-Pass",
         },
         {
-            "title": "Patlabor 2: The Movie",
-            "year": 1993,
-            "director_studio": "Mamoru Oshii / Production I.G",
-            "format": "Feature Film",
-            "platforms": ["High Seas Archival"],
-            "editorial_thesis": "A dense geopolitical thriller dissecting the illusion of peace in post-war Japan. Oshii trades standard mecha action for meditative urban layouts and civil defense strategy.",
-            "comparable_to": "Ghost in the Shell, Jin-Roh",
+            "title": "Serial Experiments Lain",
+            "year": 1998,
+            "director_studio": "Ryutaro Nakamura / Triangle Staff",
+            "format": "TV Series (13 eps)",
+            "platforms": ["Funimation / Archival"],
+            "editorial_thesis": "A prophetic exploration of wired connectivity, dissolution of personal identity, and the boundary between physical reality and cyberspace.",
+            "comparable_to": "Texhnolyze, Evangelion",
         },
+        {
+            "title": "Paranoia Agent",
+            "year": 2004,
+            "director_studio": "Satoshi Kon / Madhouse",
+            "format": "TV Series (13 eps)",
+            "platforms": ["Crunchyroll"],
+            "editorial_thesis": "A brilliant psychological satire on modern societal pressure and mass hysteria centered around a mysterious rollerblading assailant.",
+            "comparable_to": "Perfect Blue, Paprika",
+        }
     ]
+    
     return [
-        item
-        for item in curated_pool
+        item for item in curated_pool
         if item["title"].lower() not in st.session_state.watched_vault
-    ]
-
-
+    ][:4]
+    
 # Sidebar: Tracker Synchronizer
 st.sidebar.markdown("### Tracker Synchronization")
 st.sidebar.caption(
