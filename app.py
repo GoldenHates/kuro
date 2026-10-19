@@ -231,7 +231,7 @@ def log_to_anilist_live(title: str, token: str) -> bool:
 
 
 def get_ai_recommendations(
-    gemini_key: str,
+    api_key: str,
     taste_notes: str,
     platforms: list,
     high_seas: bool,
@@ -257,7 +257,7 @@ def get_ai_recommendations(
     Platform filter: {platform_constraint}
     Titles to strictly EXCLUDE (user has already watched): {json.dumps(excluded_sample)}
 
-    Return exactly 4 entries in this JSON structure:
+    Return exactly 4 entries in this JSON array structure:
     [
       {{
         "title": "Title in English or Romaji",
@@ -271,55 +271,50 @@ def get_ai_recommendations(
     ]
     """
 
-    if gemini_key:
-        clean_key = gemini_key.strip()
-        
-        # Required structure for both Agent Platform (Vertex Express) and AI Studio
-        payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}]
-                }
-            ],
-            "systemInstruction": {
-                "parts": [{"text": system_instruction}]
-            },
-            "generationConfig": {"temperature": 0.3},
-        }
+    if api_key:
+        clean_key = api_key.strip()
 
-        # Use x-goog-api-key (NEVER Authorization: Bearer, which causes 401 on AQ. keys)
+        # Automatically route between OpenAI (ChatGPT) and Groq (Free Llama-3.3)
+        if clean_key.startswith("gsk_"):
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            model_name = "llama-3.3-70b-versatile"
+        else:
+            url = "https://api.openai.com/v1/chat/completions"
+            model_name = "gpt-4o-mini"
+
         headers = {
             "Content-Type": "application/json",
-            "x-goog-api-key": clean_key,
+            "Authorization": f"Bearer {clean_key}",
         }
 
-        # Automatically try both Google Cloud Agent Platform and AI Studio endpoints
-        endpoints = [
-            "https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent",
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        ]
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.3,
+        }
 
-        last_error = ""
-        for url in endpoints:
-            try:
-                res = requests.post(url, json=payload, headers=headers, timeout=20)
-                if res.status_code == 200:
-                    raw_text = (
-                        res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    )
-                    cleaned = (
-                        raw_text.replace("```json", "")
-                        .replace("```", "")
-                        .strip()
-                    )
-                    return json.loads(cleaned)
-                else:
-                    last_error = f"({res.status_code}): {res.text}"
-            except Exception as e:
-                last_error = str(e)
-
-        st.sidebar.error(f"Gemini API Error {last_error}")
+        try:
+            res = requests.post(url, json=payload, headers=headers, timeout=20)
+            if res.status_code == 200:
+                raw_text = res.json()["choices"][0]["message"]["content"]
+                cleaned = (
+                    raw_text.replace("```json", "")
+                    .replace("```", "")
+                    .strip()
+                )
+                parsed = json.loads(cleaned)
+                if isinstance(parsed, dict):
+                    for val in parsed.values():
+                        if isinstance(val, list):
+                            return val
+                return parsed
+            else:
+                st.sidebar.error(f"AI API Error ({res.status_code}): {res.text}")
+        except Exception as e:
+            st.sidebar.error(f"Recommendation generation error: {e}")
 
     # Fallback curated pool if key is missing or fails
     curated_pool = [
@@ -365,7 +360,8 @@ def get_ai_recommendations(
         item for item in curated_pool
         if item["title"].lower() not in st.session_state.watched_vault
     ][:4]
-    
+
+
 # Sidebar: Tracker Synchronizer
 st.sidebar.markdown("### Tracker Synchronization")
 st.sidebar.caption(
@@ -396,14 +392,12 @@ if st.sidebar.button("Synchronize Libraries", use_container_width=True):
             total_imported += c
 
     st.sidebar.success(
-        f"Vault updated: {len(st.session_state.watched_vault)} excluded"
-        " titles"
+        f"Vault updated: {len(st.session_state.watched_vault)} excluded titles"
     )
 
 st.sidebar.divider()
 st.sidebar.markdown(
-    f"**Exclusion Vault:** `{len(st.session_state.watched_vault)}` titles"
-    " active"
+    f"**Exclusion Vault:** `{len(st.session_state.watched_vault)}` titles active"
 )
 
 manual_entry = st.sidebar.text_input("Manually exclude a title")
@@ -413,12 +407,11 @@ if st.sidebar.button("Add to Vault", use_container_width=True):
         st.sidebar.info(f"Added '{manual_entry}' to vault.")
 
 st.sidebar.divider()
-gemini_api_key = st.sidebar.text_input(
-    "Gemini API Key",
+ai_api_key = st.sidebar.text_input(
+    "ChatGPT (OpenAI) or Groq API Key",
     type="password",
     help=(
-        "Optional: Enables real-time custom generation. If blank, uses the"
-        " curated archive."
+        "Paste an OpenAI key (sk-...) or a free Groq key (gsk_...) for real-time custom generation."
     ),
 )
 
@@ -473,7 +466,7 @@ with col2:
 if st.button("Generate Curated Selections", type="primary"):
     with st.spinner("Synthesizing recommendations against exclusion vault..."):
         results = get_ai_recommendations(
-            gemini_key=gemini_api_key,
+            api_key=ai_api_key,
             taste_notes=taste_notes
             or "High-caliber psychological, philosophical anime",
             platforms=selected_platforms,
@@ -492,24 +485,24 @@ if st.session_state.recommendations:
         if title_lower in st.session_state.watched_vault:
             continue
 
+        badge_html = '<span class="high-seas-badge">🏴‍☠️ High Seas / Archival</span>' if high_seas_mode else ''
+        card_html = (
+            f'<div class="archive-card">'
+            f'<div style="display: flex; justify-content: space-between; align-items: baseline;">'
+            f'<h3 style="margin: 0;">{title} <span style="font-size: 0.9rem; color: #9ca3af; font-weight: normal;">({rec.get("year", "N/A")})</span></h3>'
+            f'<span style="font-size: 0.8rem; color: #9ca3af;">{rec.get("format", "Feature")}</span>'
+            f'</div>'
+            f'<p style="color: #6b7280; font-size: 0.85rem; margin-top: 4px; margin-bottom: 12px;">{rec.get("director_studio", "Archive Record")}</p>'
+            f'<p style="font-size: 0.95rem; line-height: 1.6; margin-bottom: 14px;">{rec.get("editorial_thesis", "")}</p>'
+            f'<div style="margin-bottom: 10px;">'
+            f'<span class="archive-tag">Reference: {rec.get("comparable_to", "N/A")}</span>'
+            f'{badge_html}'
+            f'</div>'
+            f'</div>'
+        )
+
         with st.container():
-            st.markdown(
-                f"""
-            <div class="archive-card">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <h3 style="margin: 0;">{title} <span style="font-size: 0.9rem; color: #9ca3af; font-weight: normal;">({rec.get('year', 'N/A')})</span></h3>
-                    <span style="font-size: 0.8rem; color: #9ca3af;">{rec.get('format', 'Feature')}</span>
-                </div>
-                <p style="color: #6b7280; font-size: 0.85rem; margin-top: 4px; margin-bottom: 12px;">{rec.get('director_studio', 'Archive Record')}</p>
-                <p style="font-size: 0.95rem; line-height: 1.6; margin-bottom: 14px;">{rec.get('editorial_thesis', '')}</p>
-                <div style="margin-bottom: 10px;">
-                    <span class="archive-tag">Reference: {rec.get('comparable_to', 'N/A')}</span>
-                    {'<span class="high-seas-badge">🏴‍☠️ High Seas / Archival</span>' if high_seas_mode else ''}
-                </div>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
+            st.markdown(card_html, unsafe_allow_html=True)
 
             btn_col1, btn_col2 = st.columns([1, 4])
             with btn_col1:
@@ -527,8 +520,7 @@ if st.session_state.recommendations:
                             )
                         else:
                             st.info(
-                                f"Added '{title}' to local vault (AniList"
-                                " update skipped)."
+                                f"Added '{title}' to local vault (AniList update skipped)."
                             )
                     else:
                         st.info(f"Added '{title}' to local exclusion vault.")
