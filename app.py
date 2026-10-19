@@ -272,44 +272,56 @@ def get_ai_recommendations(
     """
 
     if gemini_key:
-        try:
-            # Supports both old AIza keys and new AQ auth keys via Authorization header
-            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {gemini_key}" if gemini_key.startswith("AQ") else None
-            }
-            # Fall back to URL parameter if it's a legacy key format
-            if not gemini_key.startswith("AQ"):
-                url = f"{url}?key={gemini_key}"
-                headers = {"Content-Type": "application/json"}
+        clean_key = gemini_key.strip()
+        
+        # Required structure for both Agent Platform (Vertex Express) and AI Studio
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "systemInstruction": {
+                "parts": [{"text": system_instruction}]
+            },
+            "generationConfig": {"temperature": 0.3},
+        }
 
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "systemInstruction": {
-                    "parts": [{"text": system_instruction}]
-                },
-                "generationConfig": {"temperature": 0.3},
-            }
-            res = requests.post(url, json=payload, headers=headers, timeout=20)
-            if res.status_code == 200:
-                raw_text = (
-                    res.json()["candidates"][0]["content"]["parts"][0][
-                        "text"
-                    ]
-                )
-                cleaned = (
-                    raw_text.replace("```json", "")
-                    .replace("```", "")
-                    .strip()
-                )
-                return json.loads(cleaned)
-            else:
-                st.sidebar.error(f"Gemini API Error ({res.status_code}): {res.text}")
-        except Exception as e:
-            st.sidebar.error(f"Recommendation generation error: {e}")
+        # Use x-goog-api-key (NEVER Authorization: Bearer, which causes 401 on AQ. keys)
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": clean_key,
+        }
 
-    # Fallback curated pool
+        # Automatically try both Google Cloud Agent Platform and AI Studio endpoints
+        endpoints = [
+            "https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        ]
+
+        last_error = ""
+        for url in endpoints:
+            try:
+                res = requests.post(url, json=payload, headers=headers, timeout=20)
+                if res.status_code == 200:
+                    raw_text = (
+                        res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    )
+                    cleaned = (
+                        raw_text.replace("```json", "")
+                        .replace("```", "")
+                        .strip()
+                    )
+                    return json.loads(cleaned)
+                else:
+                    last_error = f"({res.status_code}): {res.text}"
+            except Exception as e:
+                last_error = str(e)
+
+        st.sidebar.error(f"Gemini API Error {last_error}")
+
+    # Fallback curated pool if key is missing or fails
     curated_pool = [
         {
             "title": "Texhnolyze",
@@ -346,9 +358,9 @@ def get_ai_recommendations(
             "platforms": ["Crunchyroll"],
             "editorial_thesis": "A brilliant psychological satire on modern societal pressure and mass hysteria centered around a mysterious rollerblading assailant.",
             "comparable_to": "Perfect Blue, Paprika",
-        }
+        },
     ]
-    
+
     return [
         item for item in curated_pool
         if item["title"].lower() not in st.session_state.watched_vault
