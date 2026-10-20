@@ -231,7 +231,7 @@ def log_to_anilist_live(title: str, token: str) -> bool:
 
 
 def get_ai_recommendations(
-    api_key: str,
+    gemini_key: str,
     taste_notes: str,
     platforms: list,
     high_seas: bool,
@@ -257,7 +257,7 @@ def get_ai_recommendations(
     Platform filter: {platform_constraint}
     Titles to strictly EXCLUDE (user has already watched): {json.dumps(excluded_sample)}
 
-    Return exactly 4 entries in this JSON array structure:
+    Return exactly 4 entries in this JSON structure:
     [
       {{
         "title": "Title in English or Romaji",
@@ -271,50 +271,55 @@ def get_ai_recommendations(
     ]
     """
 
-    if api_key:
-        clean_key = api_key.strip()
+    if gemini_key:
+        clean_key = gemini_key.strip()
+        
+        # Required structure for both Agent Platform (Vertex Express) and AI Studio
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "systemInstruction": {
+                "parts": [{"text": system_instruction}]
+            },
+            "generationConfig": {"temperature": 0.3},
+        }
 
-        # Automatically route between OpenAI (ChatGPT) and Groq (Free Llama-3.3)
-        if clean_key.startswith("gsk_"):
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            model_name = "openai/gpt-oss-120b"
-        else:
-            url = "https://api.openai.com/v1/chat/completions"
-            model_name = "gpt-4o-mini"
-
+        # Use x-goog-api-key (NEVER Authorization: Bearer, which causes 401 on AQ. keys)
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {clean_key}",
+            "x-goog-api-key": clean_key,
         }
 
-        payload = {
-            "model": model_name,
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.3,
-        }
+        # Automatically try both Google Cloud Agent Platform and AI Studio endpoints
+        endpoints = [
+            "https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        ]
 
-        try:
-            res = requests.post(url, json=payload, headers=headers, timeout=20)
-            if res.status_code == 200:
-                raw_text = res.json()["choices"][0]["message"]["content"]
-                cleaned = (
-                    raw_text.replace("```json", "")
-                    .replace("```", "")
-                    .strip()
-                )
-                parsed = json.loads(cleaned)
-                if isinstance(parsed, dict):
-                    for val in parsed.values():
-                        if isinstance(val, list):
-                            return val
-                return parsed
-            else:
-                st.sidebar.error(f"AI API Error ({res.status_code}): {res.text}")
-        except Exception as e:
-            st.sidebar.error(f"Recommendation generation error: {e}")
+        last_error = ""
+        for url in endpoints:
+            try:
+                res = requests.post(url, json=payload, headers=headers, timeout=20)
+                if res.status_code == 200:
+                    raw_text = (
+                        res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    )
+                    cleaned = (
+                        raw_text.replace("```json", "")
+                        .replace("```", "")
+                        .strip()
+                    )
+                    return json.loads(cleaned)
+                else:
+                    last_error = f"({res.status_code}): {res.text}"
+            except Exception as e:
+                last_error = str(e)
+
+        st.sidebar.error(f"Gemini API Error {last_error}")
 
     # Fallback curated pool if key is missing or fails
     curated_pool = [
