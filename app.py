@@ -277,7 +277,7 @@ def get_ai_recommendations(
         # Automatically route between OpenAI (ChatGPT) and Groq (Free Llama-3.3)
         if clean_key.startswith("gsk_"):
             url = "https://api.groq.com/openai/v1/chat/completions"
-            model_name = "llama-3.3-70b-versatile"
+            model_name = "openai/gpt-oss-120b"
         else:
             url = "https://api.openai.com/v1/chat/completions"
             model_name = "gpt-4o-mini"
