@@ -282,7 +282,7 @@ def get_ai_recommendations(
                 },
                 "generationConfig": {"temperature": 0.3},
             }
-            res = requests.post(url, json=payload, timeout=20)
+            res = requests.post(url, json=payload, timeout=40)
             if res.status_code == 200:
                 raw_text = (
                     res.json()["candidates"][0]["content"]["parts"][0]["text"]
