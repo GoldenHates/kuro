@@ -274,7 +274,7 @@ def get_ai_recommendations(
     if gemini_key:
         clean_key = gemini_key.strip()
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={clean_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={clean_key}"
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "systemInstruction": {
