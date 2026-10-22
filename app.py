@@ -249,7 +249,7 @@ def get_ai_recommendations(
     platform_constraint = (
         "Focus on titles officially licensed on: " + ", ".join(platforms)
         if not high_seas
-        else "HIGH SEAS / ARCHIVAL MODE ACTIVE: Include vintage 80s/90s OVAs, out-of-print classics, and unstreamed masterworks irrespective of commercial licensing."
+        else "HIGH SEAS / ARCHIVAL MODE ACTIVE: Include  2000/2026 OVAs, and unstreamed masterworks irrespective of commercial licensing."
     )
 
     prompt = f"""
@@ -301,13 +301,13 @@ def get_ai_recommendations(
     # Fallback curated pool if key is missing or fails
     curated_pool = [
         {
-            "title": "Texhnolyze",
-            "year": 2003,
-            "director_studio": "Hiroshi Hamasaki / Madhouse",
+            "title": "Mushoku Tensei: Jobless Reincarnation",
+            "year": 2026,
+            "director_studio": "Manabu Okamoto / egg flim",
             "format": "TV Series (22 eps)",
-            "platforms": ["Crunchyroll"],
-            "editorial_thesis": "An uncompromising exercise in subterranean existentialism with art design by Yoshitoshi ABe. Features minimal dialogue and meticulous industrial soundscapes.",
-            "comparable_to": "Serial Experiments Lain, Ergo Proxy",
+            "platforms": ["Crunchyroll", "hulu", "disney+"],
+            "editorial_thesis": "a 34-year-old unnamed, jobless Japanese shut-in who dies under unfortunate circumstances and is reincarnated into a magical fantasy world.",
+            "comparable_to": "that time that i got reincarneted as a slime, Ergo Proxy",
         },
         {
             "title": "Ergo Proxy",
