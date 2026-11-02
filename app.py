@@ -9,7 +9,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom Editorial Styling
 st.markdown(
     """
     <style>
@@ -63,7 +62,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# State Initialization
 if "watched_vault" not in st.session_state:
     st.session_state.watched_vault = set()
 if "recommendations" not in st.session_state:
@@ -72,7 +70,6 @@ if "sync_logs" not in st.session_state:
     st.session_state.sync_logs = []
 
 
-# Poster Fetching Function (Cached for speed)
 @st.cache_data(show_spinner=False, ttl=86400)
 def fetch_anime_poster(title: str) -> str:
     query = """
@@ -101,7 +98,6 @@ def fetch_anime_poster(title: str) -> str:
     return "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80"
 
 
-# Tracker Sync Functions
 def sync_anilist(username: str) -> int:
     query = """
     query ($userName: String) {
@@ -250,20 +246,4 @@ def log_to_anilist_live(title: str, token: str) -> bool:
             media_id = (
                 search_res.json().get("data", {}).get("Media", {}).get("id")
             )
-            if media_id:
-                mut_res = requests.post(
-                    "https://graphql.anilist.co",
-                    json={
-                        "query": mutation,
-                        "variables": {"mediaId": media_id},
-                    },
-                    headers=headers,
-                    timeout=10,
-                )
-                return mut_res.status_code == 200
-    except Exception:
-        pass
-    return False
-
-
-def get_ai_recommendations(gemini_key: str, taste_notes: str, platforms: list, high_seas: bool, vault:):
+            if media_
