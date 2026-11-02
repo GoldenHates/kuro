@@ -122,7 +122,7 @@ def sync_anilist(username: str) -> int:
 def sync_mal(username: str) -> int:
     try:
         url = f"https://api.jikan.moe/v4/users/{username}/animelist/completed"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=30)
         if response.status_code == 200:
             entries = response.json().get("data", [])
             count = 0
