@@ -29,6 +29,21 @@ st.markdown(
         border-radius: 8px;
         padding: 20px;
         margin-bottom: 18px;
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+    }
+    .archive-poster {
+        width: 135px;
+        height: 195px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #2e3547;
+        flex-shrink: 0;
+    }
+    .archive-content {
+        flex: 1;
+        min-width: 0;
     }
     .archive-tag {
         display: inline-block;
@@ -51,14 +66,6 @@ st.markdown(
         font-size: 0.75rem;
         font-weight: 600;
     }
-    .poster-img {
-        width: 130px;
-        height: 190px;
-        object-fit: cover;
-        border-radius: 6px;
-        border: 1px solid #232734;
-        flex-shrink: 0;
-    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -68,16 +75,4 @@ st.markdown(
 if "watched_vault" not in st.session_state:
     st.session_state.watched_vault = set()
 if "recommendations" not in st.session_state:
-    st.session_state.recommendations = []
-if "sync_logs" not in st.session_state:
-    st.session_state.sync_logs = []
-
-
-@st.cache_data(show_spinner=False, ttl=86400)
-def fetch_anime_poster(title: str) -> str:
-    query = """
-    query ($search: String) {
-      Media(search: $search, type: ANIME) {
-        coverImage {
-          extraLarge
-          large
+    st.
