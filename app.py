@@ -267,8 +267,4 @@ def log_to_anilist_live(title: str, token: str) -> bool:
 
 
 def get_ai_recommendations():
-    gemini_key: str,
-    taste_notes: str,
-    platforms: list,
-    high_seas: bool,
-    vault:
+    gemini_key: str, taste_notes: str, platforms: list, high_seas: bool, vault:
