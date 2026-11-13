@@ -309,7 +309,7 @@ def get_ai_recommendations(
 
     system_instruction = (
         "You are an authoritative, editorial film and anime archivist. "
-        "Recommend strictly 4 distinctive anime titles that match the user's taste criteria. "
+        "Recommend strictly 10 distinctive anime titles that match the user's taste criteria. "
         "CRITICAL: Never recommend any title present in the exclusion list. "
         "Output ONLY a raw, valid JSON array of objects without Markdown formatting or fences."
     )
